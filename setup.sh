@@ -20,8 +20,12 @@ if ! id "mywebapp" &>/dev/null; then
     useradd -r -s /bin/false mywebapp
 fi
 
+if ! getent group operator >/dev/null; then
+    groupadd operator
+fi
+
 if ! id "operator" &>/dev/null; then
-    useradd -m -s /bin/bash operator
+    useradd -m -g operator -s /bin/bash operator
     echo "operator:12345678" | chpasswd
     chage -d 0 operator
 fi
