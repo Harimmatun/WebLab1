@@ -12,7 +12,8 @@ usermod -aG sudo teacher
 echo "teacher:12345678" | chpasswd
 chage -d 0 teacher
 
-useradd -r -s /bin/false app
+# ВИПРАВЛЕНО: Користувач mywebapp замість app
+useradd -r -s /bin/false mywebapp
 
 useradd -m -s /bin/bash operator
 echo "operator:12345678" | chpasswd
@@ -26,14 +27,15 @@ chmod 0440 /etc/sudoers.d/operator
 echo "17" > /home/student/gradebook
 chown student:student /home/student/gradebook
 
+# ВИПРАВЛЕНО: Користувач БД mywebapp
 sudo -u postgres psql -c "CREATE DATABASE inventory;"
-sudo -u postgres psql -c "CREATE USER app WITH PASSWORD 'password';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE inventory TO app;"
-sudo -u postgres psql -d inventory -c "ALTER SCHEMA public OWNER TO app;"
+sudo -u postgres psql -c "CREATE USER mywebapp WITH PASSWORD 'password';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE inventory TO mywebapp;"
+sudo -u postgres psql -d inventory -c "ALTER SCHEMA public OWNER TO mywebapp;"
 
 mkdir -p /opt/mywebapp
 cp -r ./* /opt/mywebapp/
-chown -R app:app /opt/mywebapp
+chown -R mywebapp:mywebapp /opt/mywebapp
 
 mkdir -p /etc/mywebapp
 cat <<EOF > /etc/mywebapp/config.json
@@ -41,15 +43,15 @@ cat <<EOF > /etc/mywebapp/config.json
     "port": 3000,
     "db_host": "127.0.0.1",
     "db_name": "inventory",
-    "db_user": "app",
+    "db_user": "mywebapp",
     "db_password": "password"
 }
 EOF
-chown -R app:app /etc/mywebapp
+chown -R mywebapp:mywebapp /etc/mywebapp
 
 cd /opt/mywebapp
-sudo -u app python3 -m venv venv
-sudo -u app ./venv/bin/pip install -r requirements.txt
+sudo -u mywebapp python3 -m venv venv
+sudo -u mywebapp ./venv/bin/pip install -r requirements.txt
 
 cat <<EOF > /etc/systemd/system/mywebapp.socket
 [Unit]
@@ -69,7 +71,7 @@ Requires=mywebapp.socket
 After=network.target postgresql.service
 
 [Service]
-User=app
+User=mywebapp
 WorkingDirectory=/opt/mywebapp
 ExecStartPre=/opt/mywebapp/venv/bin/python /opt/mywebapp/migrate.py
 ExecStart=/opt/mywebapp/venv/bin/gunicorn app:app
@@ -83,15 +85,27 @@ systemctl daemon-reload
 systemctl enable mywebapp.socket
 systemctl start mywebapp.socket
 
+# ВИПРАВЛЕНО: Маршрутизація та логування Nginx
 cat <<EOF > /etc/nginx/sites-available/mywebapp
 server {
     listen 80;
     server_name _;
 
-    location / {
+    access_log /var/log/nginx/mywebapp_access.log;
+
+    location = / {
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
+    }
+
+    location /items {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host \$host;
+    }
+
+    location /health {
+        deny all;
+        return 404;
     }
 }
 EOF
