@@ -10,7 +10,7 @@ def get_config():
     return {
         "db_host": "127.0.0.1",
         "db_name": "inventory",
-        "db_user": "app",
+        "db_user": "mywebapp",
         "db_password": "password"
     }
 

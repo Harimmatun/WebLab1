@@ -15,7 +15,7 @@ def get_config():
         "port": 3000,
         "db_host": "127.0.0.1",
         "db_name": "inventory",
-        "db_user": "app",
+        "db_user": "mywebapp",
         "db_password": "password"
     }
 
@@ -32,9 +32,9 @@ def get_db():
 def index():
     return """
     <ul>
-        <li><a href="/items">GET /items</a></li>
-        <li><a href="/health/alive">GET /health/alive</a></li>
-        <li><a href="/health/ready">GET /health/ready</a></li>
+        <li><a href="/items">GET /items</a> - Список усіх предметів</li>
+        <li>POST /items - Створити новий предмет (JSON/Form)</li>
+        <li>GET /items/&lt;id&gt; - Детальна інформація по запису</li>
     </ul>
     """, 200, {'Content-Type': 'text/html'}
 
