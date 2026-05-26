@@ -11,12 +11,13 @@ def get_config():
     if os.path.exists(config_path):
         with open(config_path, 'r') as f:
             return json.load(f)
+            
     return {
-        "port": 3000,
-        "db_host": "127.0.0.1",
-        "db_name": "inventory",
-        "db_user": "mywebapp",
-        "db_password": "password"
+        "port": int(os.environ.get('PORT', 3000)),
+        "db_host": os.environ.get('DB_HOST', '127.0.0.1'),
+        "db_name": os.environ.get('DB_NAME', 'inventory'),
+        "db_user": os.environ.get('DB_USER', 'mywebapp'),
+        "db_password": os.environ.get('DB_PASSWORD', 'password')
     }
 
 def get_db():
