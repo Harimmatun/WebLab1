@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
@@ -118,3 +118,55 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  deploy-and-verify:
+    needs: [build-and-push]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: self-hosted
+    env:
+      TARGET_HOST: 10.191.51.182
+      TARGET_USER: dmytro
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Prepare setup script with real repository name
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          sed -i "s/\${GITHUB_REPOSITORY_PLACEHOLDER}/$REPO_LOWER/g" setup-target.sh
+
+      - name: Copy setup script to Target Node
+        run: |
+          scp -o StrictHostKeyChecking=no setup-target.sh ${{ env.TARGET_USER }}@${/etc/mywebapp/config.json:ro env.TARGET_HOST }}:~/setup-target.sh
+          ssh -o StrictHostKeyChecking=no ${{ env.TARGET_USER }}@${{ env.TARGET_HOST }} "chmod +x ~/setup-target.sh && ./setup-target.sh"
+
+      - name: Pull image and Run Migrations on Target Node
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          ssh -o StrictHostKeyChecking=no ${{ env.TARGET_USER }}@${{ env.TARGET_HOST }} "
+            sudo docker pull ghcr.io/$REPO_LOWER:stable
+            sudo docker run --rm --net=host -v /etc/mywebapp/config.json:/etc/mywebapp/config.json:ro ghcr.io/$REPO_LOWER:stable python migrate.py
+          "
+
+      - name: Restart Application Service on Target Node
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ env.TARGET_USER }}@${{ env.TARGET_HOST }} "sudo systemctl restart mywebapp-container.service"
+
+      - name: Verify Deployment (Service Discovery & Nginx)
+        run: |
+          sleep 5
+          echo "Checking HTTP status code from Nginx..."
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ env.TARGET_HOST }}/)
+          if [ "$STATUS_CODE" -ne 200 ]; then
+            echo "Verification failed! Nginx returned status $STATUS_CODE"
+            exit 1
+          fi
+          echo "Nginx proxy configuration is valid. Status 200 OK received."
+
+          echo "Checking application endpoint responsiveness..."
+          ALIVE_STATUS=$(curl -s http://${{ env.TARGET_HOST }}/items)
+          if [[ -z "$ALIVE_STATUS" ]]; then
+            echo "Verification failed! App items endpoint is down."
+            exit 1
+          fi
+          echo "Verification successful! Service is healthy."
