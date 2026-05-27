@@ -120,5 +120,5 @@ if __name__ == '__main__':
 
 import sys
 def  bad_function( ):
-  x=100
-  return  x
+ x=100 
+ return  x
