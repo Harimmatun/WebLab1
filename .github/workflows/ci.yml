@@ -71,7 +71,7 @@ jobs:
           DB_PASSWORD: password
           DB_NAME: inventory
         run: |
-          # Запускаємо тести і вимагаємо мінімум 40% покриття
+          python migrate.py
           pytest --cov=app test_app.py --cov-report=term-missing --cov-report=html --cov-fail-under=40
 
       - name: Upload Coverage Report
