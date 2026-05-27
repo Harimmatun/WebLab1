@@ -133,13 +133,13 @@ jobs:
       - name: Prepare setup script with real repository name
         run: |
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          sed -i "s/\${GITHUB_REPOSITORY_PLACEHOLDER}/$REPO_LOWER/g" setup-target.sh
+          sed -i "s|\${GITHUB_REPOSITORY_PLACEHOLDER}|$REPO_LOWER|g" setup-target.sh
 
       - name: Copy setup script to Target Node
         run: |
           scp -o StrictHostKeyChecking=no setup-target.sh ${{ env.TARGET_USER }}@${{ env.TARGET_HOST }}:~/setup-target.sh
           ssh -o StrictHostKeyChecking=no ${{ env.TARGET_USER }}@${{ env.TARGET_HOST }} "chmod +x ~/setup-target.sh && ./setup-target.sh"
-          
+
       - name: Pull image and Run Migrations on Target Node
         run: |
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
