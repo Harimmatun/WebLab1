@@ -117,3 +117,8 @@ def item_detail(item_id):
 if __name__ == '__main__':
     cfg = get_config()
     app.run(host='0.0.0.0', port=cfg.get('port', 3000))
+
+import sys
+def  very_bad_function( ):
+  x=100
+  return  x
