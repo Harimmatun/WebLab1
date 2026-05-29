@@ -1,0 +1,28 @@
+---
+- name: Create teacher user
+  user:
+    name: teacher
+    shell: /bin/bash
+    groups: sudo
+    append: yes
+
+- name: Set password for teacher and force change on next login
+  shell: |
+    echo "teacher:12345678" | chpasswd
+    chage -d 0 teacher
+  changed_when: false
+
+- name: Create student user (if not exists)
+  user:
+    name: student
+    shell: /bin/bash
+    groups: sudo
+    append: yes
+
+- name: Create gradebook file with variant number
+  copy:
+    content: "17\n"
+    dest: /home/student/gradebook
+    owner: student
+    group: student
+    mode: '0644'

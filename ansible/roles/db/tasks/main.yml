@@ -1,0 +1,43 @@
+---
+- name: Update apt cache and install PostgreSQL
+  command: apt-get update
+
+- name: Install PostgreSQL packages
+  command: apt-get install -y postgresql postgresql-contrib python3-psycopg2
+
+- name: Start and enable PostgreSQL service
+  systemd:
+    name: postgresql
+    state: started
+    enabled: yes
+
+- name: Create database inventory
+  command: sudo -u postgres psql -c "CREATE DATABASE inventory;"
+  register: db_creation
+  failed_when: db_creation.rc != 0 and 'already exists' not in db_creation.stderr
+  changed_when: db_creation.rc == 0
+
+- name: Create database user mywebapp
+  command: sudo -u postgres psql -c "CREATE USER mywebapp WITH PASSWORD 'password';"
+  register: user_creation
+  failed_when: user_creation.rc != 0 and 'already exists' not in user_creation.stderr
+  changed_when: user_creation.rc == 0
+
+- name: Grant privileges to mywebapp
+  command: sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE inventory TO mywebapp;"
+
+- name: Alter schema owner
+  command: sudo -u postgres psql -d inventory -c "ALTER SCHEMA public OWNER TO mywebapp;"
+
+- name: Allow PostgreSQL to listen on all interfaces
+  lineinfile:
+    path: /etc/postgresql/12/main/postgresql.conf
+    regexp: '^#?listen_addresses\s*='
+    line: "listen_addresses = '*'"
+  notify: restart postgresql
+
+- name: Allow worker to connect to database
+  lineinfile:
+    path: /etc/postgresql/12/main/pg_hba.conf
+    line: "host    inventory       mywebapp        0.0.0.0/0               md5"
+  notify: restart postgresql

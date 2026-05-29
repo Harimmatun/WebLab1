@@ -1,0 +1,9 @@
+#cloud-config
+users:
+  - default
+  - name: ansible
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBxq/Os/W5/qQjyMed+KLsmAdSppIKJnlOI7DyNqG0XC ansible_wsl

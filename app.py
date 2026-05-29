@@ -37,7 +37,7 @@ def index():
         <li>POST /items - Створити новий предмет (JSON/Form)</li>
         <li>GET /items/&lt;id&gt; - Детальна інформація по запису</li>
     </ul>
-    """, 200, {'Content-Type': 'text/html'}
+    """, 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 @app.route('/health/alive', methods=['GET'])
 def alive():
@@ -84,7 +84,7 @@ def items():
         for item in items_list:
             html += f"<tr><td>{item['id']}</td><td>{item['name']}</td></tr>"
         html += "</table>"
-        return html, 200, {'Content-Type': 'text/html'}
+        return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
         
     return jsonify(items_list), 200
 
@@ -110,7 +110,7 @@ def item_detail(item_id):
             <li>Created At: {item['created_at']}</li>
         </ul>
         """
-        return html, 200, {'Content-Type': 'text/html'}
+        return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
         
     return jsonify(item), 200
 

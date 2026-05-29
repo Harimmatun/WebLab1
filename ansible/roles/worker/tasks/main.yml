@@ -1,0 +1,139 @@
+---
+- name: Update apt cache
+  command: apt-get update
+
+- name: Install Nginx, Python, and dependencies
+  command: apt-get install -y python3 python3-venv python3-pip nginx sudo curl
+
+- name: Create mywebapp system user
+  user:
+    name: mywebapp
+    system: yes
+    shell: /bin/false
+
+- name: Create operator group
+  group:
+    name: operator
+    state: present
+
+- name: Create operator user
+  user:
+    name: operator
+    shell: /bin/bash
+    group: operator
+
+- name: Set password for operator and force change
+  shell: |
+    echo "operator:12345678" | chpasswd
+    chage -d 0 operator
+  changed_when: false
+
+- name: Configure sudo for operator
+  copy:
+    dest: /etc/sudoers.d/operator
+    content: |
+      operator ALL=(ALL) NOPASSWD: /bin/systemctl start mywebapp.service, /bin/systemctl stop mywebapp.service, /bin/systemctl restart mywebapp.service, /bin/systemctl status mywebapp.service, /bin/systemctl reload nginx.service
+    mode: '0440'
+
+- name: Create app and config directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: mywebapp
+    group: mywebapp
+  with_items:
+    - /opt/mywebapp
+    - /etc/mywebapp
+
+- name: Copy application files
+  copy:
+    src: "{{ playbook_dir }}/../{{ item }}"
+    dest: /opt/mywebapp/
+    owner: mywebapp
+    group: mywebapp
+  with_items:
+    - app.py
+    - migrate.py
+    - requirements.txt
+  notify: restart mywebapp
+
+- name: Generate config.json from template
+  template:
+    src: config.json.j2
+    dest: /etc/mywebapp/config.json
+    owner: mywebapp
+    group: mywebapp
+
+- name: Create Python virtual environment
+  command:
+    cmd: sudo -u mywebapp /usr/bin/python3 -m venv /opt/mywebapp/venv
+    creates: /opt/mywebapp/venv
+
+- name: Install Python requirements
+  command: sudo -u mywebapp /opt/mywebapp/venv/bin/pip install -r /opt/mywebapp/requirements.txt
+
+- name: Run database migration
+  command: sudo -u mywebapp /opt/mywebapp/venv/bin/python /opt/mywebapp/migrate.py
+  register: migration_result
+  changed_when: "'successfully' in migration_result.stdout"
+
+- name: Create systemd service for mywebapp
+  copy:
+    dest: /etc/systemd/system/mywebapp.service
+    content: |
+      [Unit]
+      Description=My Web App
+      After=network.target
+
+      [Service]
+      User=mywebapp
+      WorkingDirectory=/opt/mywebapp
+      ExecStart=/opt/mywebapp/venv/bin/gunicorn -b 127.0.0.1:3000 app:app
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: restart mywebapp
+
+- name: Configure Nginx as reverse proxy
+  copy:
+    dest: /etc/nginx/sites-available/mywebapp
+    content: |
+      server {
+          listen 80;
+          server_name _;
+
+          location / {
+              proxy_pass http://127.0.0.1:3000;
+              proxy_set_header Host $host;
+          }
+
+          location /items {
+              proxy_pass http://127.0.0.1:3000;
+              proxy_set_header Host $host;
+          }
+
+          location /health {
+              proxy_pass http://127.0.0.1:3000;
+              proxy_set_header Host $host;
+          }
+      }
+  notify: restart nginx
+
+- name: Enable Nginx site
+  file:
+    src: /etc/nginx/sites-available/mywebapp
+    dest: /etc/nginx/sites-enabled/mywebapp
+    state: link
+  notify: restart nginx
+
+- name: Remove default Nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: restart nginx
+
+- name: Lock default vagrant user password
+  command: usermod -L vagrant
+  ignore_errors: yes
+  changed_when: false
